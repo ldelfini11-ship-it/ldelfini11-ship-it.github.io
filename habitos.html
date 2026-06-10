@@ -1972,32 +1972,16 @@ function buildAndStoreSchedule(settings) {
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return null;
   try {
-    // blob: URLs don't work as SW on Android — use inline data: approach via importScripts workaround
-    // Instead, write SW code to a named cache and serve it
-    const swCode = [
-      "self.addEventListener('install',()=>self.skipWaiting());",
-      "self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));",
-      "self.addEventListener('notificationclick',e=>{",
-      "  e.notification.close();",
-      "  e.waitUntil(clients.matchAll({type:'window'}).then(list=>{",
-      "    for(const c of list){if('focus' in c)return c.focus();}",
-      "    if(clients.openWindow)return clients.openWindow('.');",
-      "  }));",
-      "});",
-      "self.addEventListener('message',e=>{",
-      "  if(e.data&&e.data.type==='SHOW_NOTIF'){",
-      "    self.registration.showNotification(e.data.title,e.data.options);",
-      "  }",
-      "});"
-    ].join('\n');
+    const reg = await navigator.serviceWorker.register('/habitos-sw.js', { scope: '/' });
+    swReg = reg;
+    await navigator.serviceWorker.ready;
+    return reg;
+  } catch (e) {
+    console.warn('SW register failed:', e);
+    return null;
+  }
+}
 
-    // Store SW code in cache so it can be fetched
-    if ('caches' in window) {
-      const cache = await caches.open('habitos-sw-v1');
-      await cache.put('/habitos-sw.js', new Response(swCode, {
-        headers: { 'Content-Type': 'application/javascript' }
-      }));
-    }
 
     // Try registering — will work if served via HTTPS or localhost
     // On file:// protocol this will fail, which is expected
