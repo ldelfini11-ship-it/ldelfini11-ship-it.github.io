@@ -25,7 +25,7 @@
   --border2: rgba(255,255,255,0.12);
   --text: #f0ede8;
   --muted: #888885;
-  --accent: #11be8e;
+  --accent: #c8f060;
   --accent2: #60c8f0;
   --accent3: #f0a060;
   --accent4: #f060a8;
@@ -2247,7 +2247,7 @@ function dangerClear() {
 
 // ========== NOTIFICATIONS ==========
 
-const NOTIF_ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0e0e0f"/><polyline points="12,44 24,28 34,36 52,14" fill="none" stroke="#11be8e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="52" cy="14" r="5" fill="#11be8e"/></svg>');
+const NOTIF_ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0e0e0f"/><polyline points="12,44 24,28 34,36 52,14" fill="none" stroke="#c8f060" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="52" cy="14" r="5" fill="#c8f060"/></svg>');
 
 const DEFAULT_NOTIFS = [
   { id:'agua',      label:'💧 Água',       msg:'Hora de beber água! 💧 Beba um copo agora.',          enabled:true, startTime:'08:00', recur:'hours',   recurVal:2, weekday:-1 },
@@ -2335,7 +2335,7 @@ async function registerSW() {
   try {
     // O Service Worker do Firebase precisa estar num arquivo real na raiz do site
     // (firebase-messaging-sw.js), pois SW não funciona via blob/cache em produção.
-    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' }).catch(() => null);
+    const reg = await navigator.serviceWorker.register('/Luca/firebase-messaging-sw.js', { scope: '/Luca/' }).catch(() => null);
     if (reg) { swReg = reg; await navigator.serviceWorker.ready; return swReg; }
   } catch(e) { console.warn('SW register failed:', e); }
   return null;
