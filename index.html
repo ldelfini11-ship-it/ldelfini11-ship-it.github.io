@@ -14,6 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Hábitos">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js"></script>
 <style>
 :root {
   --bg: #0e0e0f;
@@ -218,12 +220,12 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 <div class="app">
   <!-- Sidebar -->
   <nav class="sidebar">
-    <span class="sidebar-logo">EXCELSIOR</span>
-    <button class="sidebar-btn active" data-page="dashboard" title="Dashboard" onclick="showPage('dashboard',this)">🎯</button>
-    <button class="sidebar-btn" data-page="habitos" title="Hábitos" onclick="showPage('habitos',this)">🧑🏻‍💻</button>
-    <button class="sidebar-btn" data-page="historico" title="Histórico" onclick="showPage('historico',this)">📅</button>
-    <button class="sidebar-btn" data-page="stats" title="Estatísticas" onclick="showPage('stats',this)">📊</button>
-    <button class="sidebar-btn" data-page="config" title="Configurações" onclick="showPage('config',this)">⚙️</button>
+    <span class="sidebar-logo">LCA</span>
+    <button class="sidebar-btn active" data-page="dashboard" title="Dashboard" onclick="showPage('dashboard',this)">⊞</button>
+    <button class="sidebar-btn" data-page="habitos" title="Hábitos" onclick="showPage('habitos',this)">◉</button>
+    <button class="sidebar-btn" data-page="historico" title="Histórico" onclick="showPage('historico',this)">◫</button>
+    <button class="sidebar-btn" data-page="stats" title="Estatísticas" onclick="showPage('stats',this)">≈</button>
+    <button class="sidebar-btn" data-page="config" title="Configurações" onclick="showPage('config',this)">⚙</button>
   </nav>
 
   <div class="main">
@@ -2249,7 +2251,8 @@ const NOTIF_ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http:
 
 const DEFAULT_NOTIFS = [
   { id:'agua',      label:'💧 Água',       msg:'Hora de beber água! 💧 Beba um copo agora.',          enabled:true, startTime:'08:00', recur:'hours',   recurVal:2, weekday:-1 },
-  { id:'remedio1',  label:'💊 Remédio',  msg:'Lembrete: tome seu remédio! 💊',            enabled:true, startTime:'10:00', recur:'hours',    recurVal:12, weekday:-1 },
+  { id:'remedio1',  label:'💊 Remédio 1',  msg:'Lembrete: tome seu remédio! 💊 (1ª dose)',            enabled:true, startTime:'10:00', recur:'once',    recurVal:0, weekday:-1 },
+  { id:'remedio2',  label:'💊 Remédio 2',  msg:'Lembrete: tome seu remédio! 💊 (2ª dose)',            enabled:true, startTime:'22:00', recur:'once',    recurVal:0, weekday:-1 },
   { id:'exercicio', label:'🏃 Exercício',  msg:'Hora do exercício! 🏃 30 minutos fazem a diferença.', enabled:true, startTime:'20:00', recur:'once',    recurVal:0, weekday:-1 },
   { id:'livro',     label:'📚 Livro',      msg:'Que tal ler um pouco agora? 📚',                      enabled:true, startTime:'20:00', recur:'once',    recurVal:0, weekday:-1 },
   { id:'estudo',    label:'🧠 Estudo',     msg:'Hora de estudar! 🧠 Cada minuto conta.',              enabled:true, startTime:'20:00', recur:'once',    recurVal:0, weekday:-1 },
@@ -2281,6 +2284,7 @@ function saveNotifSettings() {
   });
   persistNotifSettings(settings);
   buildAndStoreSchedule(settings);
+  sendNotifSettingsToSheet(settings);
   showToast('🔔 Notificações salvas!');
   updateNotifStatus();
 }
@@ -2313,42 +2317,72 @@ function buildAndStoreSchedule(settings) {
   startNotifLoop();
 }
 
+// ---- Firebase Cloud Messaging (push de verdade, funciona com app fechado) ----
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCBi2uXgOcCYmBBoacBm9mrFKG7oqEQPqE",
+  authDomain: "habitos-luca.firebaseapp.com",
+  projectId: "habitos-luca",
+  storageBucket: "habitos-luca.firebasestorage.app",
+  messagingSenderId: "947907360103",
+  appId: "1:947907360103:web:766cf8234aa41c9523ebc2"
+};
+const FCM_VAPID_KEY = "BBd5Kz2mkT9GsiGNikmGoV9tFH60tj-DSC-DBZtAJA5Mrm_lM0jdJdJGons_q7JjdBtbD0gkzxZaG83E0OFIwvE";
+
+let fcmApp = null, fcmMessaging = null;
+
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return null;
   try {
-    // blob: URLs don't work as SW on Android — use inline data: approach via importScripts workaround
-    // Instead, write SW code to a named cache and serve it
-    const swCode = [
-      "self.addEventListener('install',()=>self.skipWaiting());",
-      "self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));",
-      "self.addEventListener('notificationclick',e=>{",
-      "  e.notification.close();",
-      "  e.waitUntil(clients.matchAll({type:'window'}).then(list=>{",
-      "    for(const c of list){if('focus' in c)return c.focus();}",
-      "    if(clients.openWindow)return clients.openWindow('.');",
-      "  }));",
-      "});",
-      "self.addEventListener('message',e=>{",
-      "  if(e.data&&e.data.type==='SHOW_NOTIF'){",
-      "    self.registration.showNotification(e.data.title,e.data.options);",
-      "  }",
-      "});"
-    ].join('\n');
-
-    // Store SW code in cache so it can be fetched
-    if ('caches' in window) {
-      const cache = await caches.open('habitos-sw-v1');
-      await cache.put('/habitos-sw.js', new Response(swCode, {
-        headers: { 'Content-Type': 'application/javascript' }
-      }));
-    }
-
-    // Try registering — will work if served via HTTPS or localhost
-    // On file:// protocol this will fail, which is expected
-    const reg = await navigator.serviceWorker.register('/habitos-sw.js', { scope: '/' }).catch(() => null);
+    // O Service Worker do Firebase precisa estar num arquivo real na raiz do site
+    // (firebase-messaging-sw.js), pois SW não funciona via blob/cache em produção.
+    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' }).catch(() => null);
     if (reg) { swReg = reg; await navigator.serviceWorker.ready; return swReg; }
-  } catch(e) { console.warn('SW register failed (expected on file://):', e); }
+  } catch(e) { console.warn('SW register failed:', e); }
   return null;
+}
+
+async function setupFirebaseMessaging() {
+  try {
+    if (!fcmApp) {
+      fcmApp = firebase.initializeApp(FIREBASE_CONFIG);
+      fcmMessaging = firebase.messaging();
+    }
+    const reg = swReg || await navigator.serviceWorker.ready;
+    const token = await fcmMessaging.getToken({
+      vapidKey: FCM_VAPID_KEY,
+      serviceWorkerRegistration: reg
+    });
+    if (token) {
+      await sendDeviceTokenToSheet(token);
+      localStorage.setItem('habitos_fcm_token', token);
+      return token;
+    }
+  } catch(e) {
+    console.warn('Firebase messaging setup failed:', e);
+  }
+  return null;
+}
+
+// Manda o token do dispositivo pra aba "Notificacoes" da planilha, via Apps Script
+async function sendDeviceTokenToSheet(token) {
+  if (!state.sheetsUrl) return;
+  try {
+    await fetch(state.sheetsUrl, {
+      method: 'POST',
+      body: JSON.stringify({ _action: 'saveDeviceToken', token })
+    });
+  } catch(e) { console.warn('Failed to save device token:', e); }
+}
+
+// Manda também os horários configurados pra planilha (pra o Apps Script saber quando disparar)
+async function sendNotifSettingsToSheet(settings) {
+  if (!state.sheetsUrl) return;
+  try {
+    await fetch(state.sheetsUrl, {
+      method: 'POST',
+      body: JSON.stringify({ _action: 'saveNotifSettings', settings })
+    });
+  } catch(e) { console.warn('Failed to save notif settings:', e); }
 }
 
 async function showNotifViaSW(title, body, tag) {
@@ -2422,7 +2456,10 @@ async function requestNotifPermission() {
   if (r === 'granted') {
     await registerSW();
     buildAndStoreSchedule(getNotifSettings());
-    showToast('✅ Notificações ativadas!');
+    const token = await setupFirebaseMessaging();
+    await sendNotifSettingsToSheet(getNotifSettings());
+    if (token) showToast('✅ Notificações ativadas (funcionam com app fechado)!');
+    else showToast('✅ Notificações ativadas (modo local — abra o app pra receber)');
   } else {
     showToast('⚠️ Permissão negada — libere nas configurações');
   }
