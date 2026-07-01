@@ -24,8 +24,8 @@ messaging.onBackgroundMessage((payload) => {
 
   self.registration.showNotification(title, {
     body,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/Luca/icon-192.png',
+    badge: '/Luca/icon-192.png',
     tag,
     renotify: true,
     vibrate: [200, 100, 200],
