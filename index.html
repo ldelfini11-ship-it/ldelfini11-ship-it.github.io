@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hábitos — Luca</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e0e0f'/%3E%3Cpolyline points='12,44 24,28 34,36 52,14' fill='none' stroke='%23c8f060' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='52' cy='14' r='5' fill='%23c8f060'/%3E%3Cline x1='12' x2='52' y1='52' y2='52' stroke='%23c8f060' stroke-width='3' stroke-linecap='round' opacity='0.3'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e0e0f'/%3E%3Cpolyline points='12,44 24,28 34,36 52,14' fill='none' stroke='%2311be8e' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='52' cy='14' r='5' fill='%2311be8e'/%3E%3Cline x1='12' x2='52' y1='52' y2='52' stroke='%2311be8e' stroke-width='3' stroke-linecap='round' opacity='0.3'/%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -647,6 +647,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
         <div style="margin-top:16px;display:flex;gap:8px;">
           <button class="btn btn-accent" onclick="saveNotifSettings()">Salvar horários</button>
           <button class="btn btn-sm" onclick="testNotification()">Testar agora</button>
+          <button class="btn btn-sm" onclick="registrarDispositivoNotif()" style="margin-left:4px;">📱 Registrar este dispositivo</button>
         </div>
 
         <div style="margin-top:12px;padding:12px 14px;background:var(--bg3);border-radius:var(--r);border-left:3px solid var(--accent3);">
@@ -2446,6 +2447,29 @@ function _checkFire() {
     localStorage.setItem(firedKey, JSON.stringify(fired));
     showNotifViaSW('Hábitos — '+n.label, n.msg, fid);
   });
+}
+
+async function registrarDispositivoNotif() {
+  if (Notification.permission !== 'granted') {
+    await requestNotifPermission();
+    if (Notification.permission !== 'granted') return;
+  }
+  showToast('📱 Registrando dispositivo...');
+  try {
+    // Força token novo deletando o anterior
+    if (fcmMessaging) {
+      try { await fcmMessaging.deleteToken(); } catch(e) {}
+    }
+    await registerSW();
+    const token = await setupFirebaseMessaging();
+    if (token) {
+      showToast('✅ Dispositivo registrado! Notificações ativas neste aparelho.');
+    } else {
+      showToast('⚠️ Não foi possível registrar. Verifique a conexão.');
+    }
+  } catch(e) {
+    showToast('⚠️ Erro: ' + e.message);
+  }
 }
 
 async function requestNotifPermission() {
