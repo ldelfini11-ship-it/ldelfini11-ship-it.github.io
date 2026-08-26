@@ -24,16 +24,22 @@ messaging.onBackgroundMessage((payload) => {
   const habitId = (payload.data && payload.data.habitId) || '';
   const scriptUrl = (payload.data && payload.data.scriptUrl) || '';
 
+  const isExercicio = habitId === 'exercicio';
+
   self.registration.showNotification(title, {
     body,
-    icon:    '/icon-192.png',
+    icon:    isExercicio ? '/icon-treino.png' : '/icon-192.png',
     badge:   '/icon-192.png',
     tag,
     renotify: true,
     vibrate: [200, 100, 200],
     requireInteraction: false,
     data: { habitId, scriptUrl, tag },
-    actions: [
+    actions: isExercicio ? [
+      { action: 'open_treino', title: '🏋️ Treinar agora' },
+      { action: 'complete',    title: '✅ Concluído'     },
+      { action: 'snooze',      title: '⏰ +30 min'       }
+    ] : [
       { action: 'complete', title: '✅ Concluído' },
       { action: 'snooze',   title: '⏰ +30 min'   }
     ]
@@ -48,6 +54,19 @@ self.addEventListener('notificationclick', (event) => {
   const scriptUrl = data.scriptUrl || '';
 
   event.notification.close();
+
+  if (action === 'open_treino') {
+    // Abre o app Calistenia 90 - Plus Ultra
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+        for (const c of list) {
+          if (c.url.includes('/treino') && 'focus' in c) return c.focus();
+        }
+        if (clients.openWindow) return clients.openWindow('https://ldelfini11-ship-it.github.io/treino/');
+      })
+    );
+    return;
+  }
 
   if (action === 'complete' && habitId && scriptUrl) {
     // Marca o hábito como concluído via Apps Script (sem abrir o app)
